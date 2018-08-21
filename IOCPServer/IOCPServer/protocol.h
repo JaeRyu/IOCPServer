@@ -3,7 +3,7 @@
 #define MAX_BUFF_SIZE 4000
 #define MAX_PACKET_SIZE  255
 #define SERVER_PORT  8888
-
+#define MAX_STRING 256
 
 
 

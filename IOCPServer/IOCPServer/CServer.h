@@ -1,7 +1,9 @@
 #pragma once
 #include "stdafx.h"
 #include "protocol.h"
+#include "DBStruct.h"
 #include "DataBase.h"
+#include "etcFunction.h"
 
 
 enum OVERLAPPEDTYPE{OVER_RECV, OVER_SEND };
@@ -37,17 +39,30 @@ public:
 
 class CServer
 {
+private: // variable
 	SOCKET acceptSock;
 	HANDLE g_iocp;
 	std::vector<std::thread *> NetworkThreadList;
 	std::vector<std::thread *> DBThreadList;
 	std::unordered_map<SOCKET, Client> ClientList;
-	
+
+	std::vector<std::queue<IDBExec>> DBQueueList;
+
+	//std::thread* AcceptThreadPointer;
+
+public: // Getter
+
+	SOCKET GetAcceptSocket();
+	HANDLE GetGlobalIOCompletionPortHandle();
+	std::vector<std::thread *> GetNetworkThreadList();
+	std::vector<std::thread *> GetDBThreadList();
+	std::unordered_map<SOCKET, Client> GetClientList();
+
 
 private:
 	void err_quit(const char * msg);
 	void err_display(const char * msg, int err_no);
-
+	void HandleDiagnosticRecord(SQLHANDLE hHandle, SQLSMALLINT hType, RETCODE RetCode);
 
 public: // constructor and destructor
 	CServer();
@@ -62,10 +77,15 @@ public: // normal function
 public: // Send Function
 	void SendPacket(SOCKET target, void *packet);
 
+
+private: // DB Function
+	bool DBConnection(const char *ODBCName, SQLHENV &henv,SQLHDBC &hdbc, SQLHSTMT &hstmt);
+
+
 public://threadList
 	void WorkerThread();
 	void AcceptThread();
-	void DBThread();
+	void DBThread(int Threadindex);
 
 public:
 	void StartServer(int NumberOfWokrerThread);

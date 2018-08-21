@@ -5,7 +5,7 @@
 int main()
 {
 	CMiniDump::Begin();
-
+	setlocale(LC_ALL, "korean");
 
 
 	CServer server;

@@ -81,6 +81,79 @@ void CServer::SendPacket(SOCKET target, void * packet)
 
 }
 
+bool CServer::DBConnection(const char * ODBCName, SQLHENV & henv, SQLHDBC & hdbc, SQLHSTMT & hstmt)
+{
+
+	SQLRETURN retcode;
+
+	/*SQLWCHAR * OutConnStr = (SQLWCHAR *)malloc(255);
+	SQLSMALLINT * OutConnStrLen = (SQLSMALLINT *)malloc(255);*/
+
+	// Allocate environment handle  
+	retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
+
+	// Set the ODBC version environment attribute  
+	if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+		retcode = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (void*)SQL_OV_ODBC3, 0);
+
+		// Allocate connection handle  
+		if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+			retcode = SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
+
+			// Set login timeout to 5 seconds  
+			if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+				SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
+
+#ifdef UNICODE
+				retcode = SQLConnect(hdbc, ConvertChar(ODBCName), SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
+#else
+				retcode = SQLConnect(hdbc, (SQLCHAR*)ODBCName, SQL_NTS, (SQLCHAR*)NULL, 0, NULL, 0);
+#endif
+				// Connect to data source  
+				
+
+				// Allocate statement handle  
+				if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+					retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+
+					// Process data  
+					if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+						std::cout << "DB Connect Success" << std::endl;
+
+						return true;
+					}
+					else
+					{
+						HandleDiagnosticRecord(hstmt, SQL_HANDLE_STMT, retcode);
+						return false;
+					}
+				}
+				else
+				{
+					HandleDiagnosticRecord(hdbc, SQL_HANDLE_DBC, retcode);
+					return false;
+				}
+			}
+			else
+			{
+				HandleDiagnosticRecord(hdbc, SQL_HANDLE_DBC, retcode);
+				return false;
+			}
+		}
+		else
+		{
+			HandleDiagnosticRecord(henv, SQL_HANDLE_ENV, retcode);
+			return false;
+		}
+
+	}
+	else
+	{
+		HandleDiagnosticRecord(henv, SQL_HANDLE_ENV, retcode);
+		return false;
+	}
+}
+
 void CServer::WorkerThread()
 {
 
@@ -108,7 +181,6 @@ void CServer::WorkerThread()
 
 		if (0 == data_size) {
 			
-			std::cout << "Client [" << key << "] Disconnected." << std::endl;
 			DisconnectClient(key);
 			continue;
 		}
@@ -119,12 +191,12 @@ void CServer::WorkerThread()
 
 		if (OVER_RECV == o->overtype)
 		{
-			//int recv_size = data_size;
+			int recv_size = data_size;
 			char *ptr = o->io_buf;
 
 			//reassemble packet ---------------------------------------------------------------
 
-			while (0 < data_size) // recv data is exist
+			while (0 < recv_size) // recv data is exist
 			{
 				if (0 == ClientList[sock].packet_size) // check it's first time get this packet
 				{
@@ -134,9 +206,9 @@ void CServer::WorkerThread()
 				
 				int remain = ClientList[sock].packet_size - ClientList[sock].prev_size; // check necessary size for complete assemble packet
 
-				if (remain <= data_size) // can assemble packet
+				if (remain <= recv_size) // can assemble packet
 				{
-					memcpy(ClientList[sock].prev_packet + ClientList[sock].prev_size,
+					memcpy_s(ClientList[sock].prev_packet + ClientList[sock].prev_size,MAX_PACKET_SIZE ,
 						ptr, remain);
 
 					
@@ -145,17 +217,17 @@ void CServer::WorkerThread()
 
 
 
-					data_size -= remain;
+					recv_size -= remain;
 					ptr += remain;
 					ClientList[sock].packet_size = 0;
 					ClientList[sock].prev_size = 0;
 				}
 				else // can't assemble packet so, need more data
 				{
-					memcpy(ClientList[sock].prev_packet + ClientList[sock].prev_size, ptr, data_size);
-					ClientList[sock].prev_size += data_size;
+					memcpy_s(ClientList[sock].prev_packet + ClientList[sock].prev_size,MAX_PACKET_SIZE, ptr, recv_size);
+					ClientList[sock].prev_size += recv_size;
 					ptr += data_size;
-					data_size = 0;
+					recv_size = 0;
 					
 
 				}
@@ -228,12 +300,36 @@ void CServer::AcceptThread()
 	}
 }
 
-void CServer::DBThread()
+void CServer::DBThread(int ThreadIndex)
 {
+	int tIndex = ThreadIndex;
 	SQLHENV henv;
 	SQLHDBC hdbc;
 	SQLHSTMT hstmt;
 
+	//DBConnection("ODBCName", henv, hdbc, hstmt);
+
+#ifdef _DEBUG	
+	std::cout << tIndex << " : DBThread Start"<< std::endl;
+#endif
+	
+	DBConnection("2012180027_GameServer", henv, hdbc, hstmt);
+
+	//while(true)
+	//{
+	//	
+	//	//IDBExec *dbexec = DBQueueList[tIndex].front()
+	//	if (true == DBQueueList[tIndex].empty())
+	//	{
+	//		continue;
+	//	}
+	//	else
+	//	{
+	//		auto dbexec = DBQueueList[tIndex].front();
+	//		//dbexec.Excute();
+	//	}
+
+	//}
 }
 
 void CServer::StartServer(int NumberOfWokrerThread)
@@ -293,11 +389,26 @@ void CServer::StartServer(int NumberOfWokrerThread)
 	}
 	//-------------------------------------------------------------------------------
 
+	
+
+
+	//Create DBThreads------------------------------------------------------------------
+
+
+	DBThreadList.push_back(new std::thread([&]() { DBThread(1); }));
+
+	//----------------------------------------------------------------------------------
+
+
+
+
+
+	//Set Program Not Close
+	//Can Delete this Part
 	for (int i = 0; i < NetworkThreadList.size(); ++i)
 	{
 		NetworkThreadList[i]->join();
 	}
-
 }
 
 
@@ -324,4 +435,66 @@ void CServer::err_display(const char * msg, int err_no)
 		(LPTSTR)&lpMsgBuf, 0, NULL);
 	std::cout << "[" << msg << "]" << (char *)lpMsgBuf << std::endl;
 	LocalFree(lpMsgBuf);
+}
+
+void CServer::HandleDiagnosticRecord(SQLHANDLE hHandle, SQLSMALLINT hType, RETCODE RetCode)
+{
+#ifdef UNICODE
+		SQLSMALLINT iRec = 0;
+		SQLINTEGER iError;
+		WCHAR wszMessage[1000];
+		WCHAR wszState[SQL_SQLSTATE_SIZE + 1];
+		if (RetCode == SQL_INVALID_HANDLE) {
+			fwprintf(stderr, L"Invalid handle!\n");
+			return;
+		}
+		while (SQLGetDiagRec(hType, hHandle, ++iRec, wszState, &iError, wszMessage,
+			(SQLSMALLINT)(sizeof(wszMessage) / sizeof(WCHAR)), (SQLSMALLINT *)NULL) == SQL_SUCCESS) {
+			// Hide data truncated..
+			if (wcsncmp(wszState, L"01004", 5)) {
+				fwprintf(stderr, L"[%5.5s] %s (%d)\n", wszState, wszMessage, iError);
+			}
+		}
+#else
+	SQLSMALLINT iRec = 0;
+	SQLINTEGER iError;
+	CHAR wszMessage[1000];
+	CHAR wszState[SQL_SQLSTATE_SIZE + 1];
+	
+	if (RetCode == SQL_INVALID_HANDLE) {
+		fwprintf(stderr, L"Invalid handle!\n");
+		return;
+	}
+	while (SQLGetDiagRec(hType, hHandle, ++iRec, (SQLCHAR*)wszState, &iError, (SQLCHAR*)wszMessage,
+		(SQLSMALLINT)(sizeof(wszMessage) / sizeof(WCHAR)), (SQLSMALLINT *)NULL) == SQL_SUCCESS) {
+		// Hide data truncated..
+		if (strncmp(wszState, "01004", 5)) {
+			fprintf(stderr, "[%5.5s] %s (%d)\n", wszState, wszMessage, iError);
+		}
+	}
+
+#endif
+	
+}
+
+
+SOCKET CServer::GetAcceptSocket()
+{
+	return acceptSock;
+}
+HANDLE CServer::GetGlobalIOCompletionPortHandle()
+{
+	return g_iocp;
+}
+std::vector<std::thread *> CServer::GetNetworkThreadList()
+{
+	return NetworkThreadList;
+}
+std::vector<std::thread *> CServer::GetDBThreadList()
+{
+	return DBThreadList;
+}
+std::unordered_map<SOCKET, Client> CServer::GetClientList()
+{
+	return ClientList;
 }

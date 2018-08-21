@@ -1,5 +1,6 @@
 #pragma once
 #include "stdafx.h"
+#include "DBStruct.h"
 
 // set interface for process db data
 // it's in queue DbEvent
@@ -8,7 +9,7 @@
 
 __interface IDBExec
 {
-	virtual void Excute() = 0;
+	virtual void Excute(void* ptr) = 0;
 };
 
 
@@ -16,6 +17,5 @@ __interface IDBExec
 class DBExecGetUserData
 {
 public:
-	void Excute();
-
+	void Excute(void *ptr);
 };
