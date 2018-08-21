@@ -228,6 +228,14 @@ void CServer::AcceptThread()
 	}
 }
 
+void CServer::DBThread()
+{
+	SQLHENV henv;
+	SQLHDBC hdbc;
+	SQLHSTMT hstmt;
+
+}
+
 void CServer::StartServer(int NumberOfWokrerThread)
 {
 	WSADATA wsa;

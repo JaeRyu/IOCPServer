@@ -6,8 +6,16 @@ int main()
 {
 	CMiniDump::Begin();
 
+
+
 	CServer server;
-	server.StartServer(1);
+
+	SYSTEM_INFO sys_info;
+	GetSystemInfo(&sys_info);
+
+	
+
+	server.StartServer(sys_info.dwNumberOfProcessors);
 
 	
 

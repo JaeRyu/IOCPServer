@@ -1,6 +1,8 @@
 #pragma once
 #include "stdafx.h"
 #include "protocol.h"
+#include "DataBase.h"
+
 
 enum OVERLAPPEDTYPE{OVER_RECV, OVER_SEND };
 
