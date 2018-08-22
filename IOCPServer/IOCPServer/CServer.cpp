@@ -12,6 +12,7 @@ Client::Client()
 	exover.wsabuf.len = sizeof(exover.io_buf);
 	packet_size = 0;
 	prev_size = 0;
+	DBQueueNumber = 0;
 }
 
 Client::Client(const Client& c)
@@ -23,12 +24,12 @@ Client::Client(const Client& c)
 	exover.wsabuf.len = sizeof(exover.io_buf);
 	packet_size = 0;
 	prev_size = 0;
+	DBQueueNumber = c.DBQueueNumber;
 }
 
 CServer::CServer()
 {
 }
-
 
 CServer::~CServer()
 {
@@ -54,6 +55,8 @@ void CServer::ProcessPacket(SOCKET s, char * packet)
 		p.type = SC_HELLO;
 
 		SendPacket(s, &p);
+		DBExecGetUserData *db = new DBExecGetUserData;
+		DBQueueList[ClientList[s].DBQueueNumber].push(db);
 	}
 		break;
 
@@ -257,7 +260,7 @@ void CServer::WorkerThread()
 
 void CServer::AcceptThread()
 {
-
+	int DBQueueCount = 1;
 	while (true)
 	{
 		SOCKADDR_IN c_addr;
@@ -274,6 +277,8 @@ void CServer::AcceptThread()
 		//Add to IOCP and ClientList
 		Client new_client = Client();
 		new_client.s = new_socket;
+		new_client.DBQueueNumber = DBQueueCount++;
+		DBQueueCount %=DBQueueList.size();
 		
 		CreateIoCompletionPort(reinterpret_cast<HANDLE>(new_socket), g_iocp, new_socket, 0);
 
@@ -313,26 +318,38 @@ void CServer::DBThread(int ThreadIndex)
 	std::cout << tIndex << " : DBThread Start"<< std::endl;
 #endif
 	
-	DBConnection("2012180027_GameServer", henv, hdbc, hstmt);
+	
+	//std::cout << tIndex << " : DBThread Start" << std::endl;
 
-	//while(true)
-	//{
-	//	
-	//	//IDBExec *dbexec = DBQueueList[tIndex].front()
-	//	if (true == DBQueueList[tIndex].empty())
-	//	{
-	//		continue;
-	//	}
-	//	else
-	//	{
-	//		auto dbexec = DBQueueList[tIndex].front();
-	//		//dbexec.Excute();
-	//	}
+	DBConnection("ODBCName", henv, hdbc, hstmt);
 
-	//}
+	while(true)
+	{
+		
+		//IDBExec *dbexec = DBQueueList[tIndex].front()
+		if (true == DBQueueList[tIndex].empty())
+		{
+			continue;
+		}
+		else
+		{
+			DBUserData data;
+			data.sqlData.hdbc = hdbc;
+			data.sqlData.henv = henv;
+			data.sqlData.hstmt = hstmt;
+			strcpy(	data.id ,"user001");
+			strcpy(data.pw, "1111");
+
+			IDBExec* dbexec = DBQueueList[tIndex].front();
+			dbexec->Excute((void *)&data);
+			DBQueueList[tIndex].pop();
+			delete dbexec;
+		}
+
+	}
 }
 
-void CServer::StartServer(int NumberOfWokrerThread)
+void CServer::SetUpServer(int NumberOfWokrerThread, int NumberOfDBThread)
 {
 	WSADATA wsa;
 	WSAStartup(MAKEWORD(2, 2), &wsa);
@@ -379,8 +396,6 @@ void CServer::StartServer(int NumberOfWokrerThread)
 
 
 	//Create Theads------------------------------------------------------------------
-	//Always AccpetThread is 0 of NetworkthreadList
-	NetworkThreadList.push_back(new std::thread{ &CServer::AcceptThread, this });
 
 	for (int i = 0; i < NumberOfWokrerThread; ++i)
 	{
@@ -394,8 +409,12 @@ void CServer::StartServer(int NumberOfWokrerThread)
 
 	//Create DBThreads------------------------------------------------------------------
 
-
-	DBThreadList.push_back(new std::thread([&]() { DBThread(1); }));
+	for (int i = 0; i < NumberOfDBThread; ++i)
+	{
+		std::queue<IDBExec *> q;
+		DBQueueList.push_back(q);
+		DBThreadList.push_back(new std::thread([&]() { DBThread(i); }));
+	}
 
 	//----------------------------------------------------------------------------------
 
@@ -403,15 +422,25 @@ void CServer::StartServer(int NumberOfWokrerThread)
 
 
 
-	//Set Program Not Close
-	//Can Delete this Part
-	for (int i = 0; i < NetworkThreadList.size(); ++i)
-	{
-		NetworkThreadList[i]->join();
-	}
+	
+}
+
+void CServer::StartServer()
+{
+	AcceptThreadPointer = new std::thread{ &CServer::AcceptThread, this };
 }
 
 
+
+
+
+
+
+
+
+
+
+//--------------------------------------------------------------------------------------
 void CServer::err_quit(const char * msg)
 {
 	LPVOID lpMsgBuf;
@@ -497,4 +526,8 @@ std::vector<std::thread *> CServer::GetDBThreadList()
 std::unordered_map<SOCKET, Client> CServer::GetClientList()
 {
 	return ClientList;
+}
+std::thread* CServer::GetAcceptThreadPointer()
+{
+	return AcceptThreadPointer;
 }

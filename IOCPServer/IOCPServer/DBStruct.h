@@ -3,14 +3,14 @@
 
 //This For Get Data From DB
 
-struct SQLData {
+struct DBSQLData {
 	SQLHENV henv;
 	SQLHDBC hdbc;
 	SQLHSTMT hstmt;
 };
 
-struct UserData {
-	SQLData sqlData;
+struct DBUserData {
+	DBSQLData sqlData;
 	char id[10];
 	char pw[10];
 };

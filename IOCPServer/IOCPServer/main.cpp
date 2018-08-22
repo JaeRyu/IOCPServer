@@ -15,9 +15,16 @@ int main()
 
 	
 
-	server.StartServer(sys_info.dwNumberOfProcessors);
+	server.SetUpServer(sys_info.dwNumberOfProcessors, 4);
 
-	
+	server.StartServer();
+
+	auto list = server.GetNetworkThreadList();
+
+	for (auto i : list)
+	{
+		i->join();
+	}
 
 	CMiniDump::End();
 }

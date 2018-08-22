@@ -26,6 +26,8 @@ public:
 	int prev_size; // size of packet that get before
 	char prev_packet[MAX_PACKET_SIZE]; // saved packet
 
+	int DBQueueNumber;
+
 	//Additional Variable-------------------
 
 
@@ -46,9 +48,10 @@ private: // variable
 	std::vector<std::thread *> DBThreadList;
 	std::unordered_map<SOCKET, Client> ClientList;
 
-	std::vector<std::queue<IDBExec>> DBQueueList;
+	std::vector<std::queue<IDBExec *>> DBQueueList;
 
-	//std::thread* AcceptThreadPointer;
+	std::thread* AcceptThreadPointer;
+
 
 public: // Getter
 
@@ -57,7 +60,7 @@ public: // Getter
 	std::vector<std::thread *> GetNetworkThreadList();
 	std::vector<std::thread *> GetDBThreadList();
 	std::unordered_map<SOCKET, Client> GetClientList();
-
+	std::thread* GetAcceptThreadPointer();
 
 private:
 	void err_quit(const char * msg);
@@ -87,8 +90,9 @@ public://threadList
 	void AcceptThread();
 	void DBThread(int Threadindex);
 
-public:
-	void StartServer(int NumberOfWokrerThread);
+public: //Server
+	void SetUpServer(int NumberOfWokrerThread, int NumberOfDBThread); //worker thread and DB thread
+	void StartServer();  // accept thread
 	void StopServer();
 };
 
