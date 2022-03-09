@@ -330,4 +330,4 @@ ASALocalRun/
 .mfractor/
 
 #Dump
-#*.dmp
+*.dmp
